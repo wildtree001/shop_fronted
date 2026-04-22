@@ -154,7 +154,7 @@ const formatTime = (time) => {
   max-width: 1200px;
   margin: 0 auto;
   width: 100%;
-  padding: 0 10px;
+  padding: 0 10px 100px 10px;
   background: #fff;
 }
 
