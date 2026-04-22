@@ -27,13 +27,48 @@
           <h3>商品描述</h3>
           <p>{{ goods.desc || '暂无商品描述' }}</p>
         </div>
-        <div>
-      <ol class="says">
-        <li v-for="item in says" :key="item.id">
-          {{ item.says }}
-      </li>
-    </ol>
-    </div>
+
+        <!-- 评分统计 -->
+        <div class="rating-section" v-if="reviews.length > 0">
+          <h3>评分统计</h3>
+          <div class="rating-summary">
+            <span class="avg-rating">{{ avgRating > 0 ? avgRating : '暂无' }}</span>
+            <span class="rating-stars">
+              <span 
+                v-for="i in 5" 
+                :key="i"
+                :class="{ active: i <= avgRating }"
+              >★</span>
+            </span>
+            <span class="review-count">({{ reviews.length }}条评价)</span>
+          </div>
+        </div>
+
+        <!-- 评价列表 -->
+        <div class="reviews-section">
+          <h3>用户评价</h3>
+          <div v-if="reviews.length === 0" class="empty-reviews">
+            暂无评价，快来抢首评吧！
+          </div>
+          <div v-else class="reviews-list">
+            <div class="review-item" v-for="review in reviews" :key="review.id">
+              <div class="review-header">
+                <div class="user-info">
+                  <span class="nickname">{{ review.nickname }}</span>
+                  <span class="review-rating">
+                    <span 
+                      v-for="i in 5" 
+                      :key="i"
+                      :class="{ active: i <= review.rating }"
+                    >★</span>
+                  </span>
+                </div>
+                <div class="review-time">{{ formatTime(review.createTime) }}</div>
+              </div>
+              <div class="review-content">{{ review.content }}</div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- 加入购物车按钮（复用登录校验逻辑） -->
@@ -67,6 +102,7 @@ import { goodsList } from '../data/goods.js'; // 导入商品列表
 import { useCartStore } from '../store/cart.js'; // 购物车仓库
 import { getCurrentUser } from '../data/user.js'; // 用户登录状态
 import { says } from '../data/says.js'; // 导入商品说法列表
+import { getReviewsByGoodsId, getAverageRating } from '../data/review.js'; // 导入评价相关函数
 
 // 初始化数据
 const route = useRoute();
@@ -74,6 +110,8 @@ const router = useRouter();
 const cartStore = useCartStore();
 const goods = ref(null); // 当前商品详情
 const currentUser = ref(null); // 当前登录用户
+const reviews = ref([]); // 评价列表
+const avgRating = ref(0); // 平均评分
 
 // 页面加载时获取商品详情
 onMounted(() => {
@@ -85,6 +123,9 @@ onMounted(() => {
   const targetGoods = goodsList.find(item => item.id === goodsId);
   if (targetGoods) {
     goods.value = targetGoods;
+    // 加载评价数据
+    reviews.value = getReviewsByGoodsId(goodsId);
+    avgRating.value = getAverageRating(goodsId);
   }
 });
 
@@ -99,6 +140,12 @@ const addToCart = (goodsItem) => {
   cartStore.loadUserCart();
   cartStore.$patch({});
   ElMessage.success(`已将【${goodsItem.name}】加入购物车`);
+};
+
+// 格式化时间
+const formatTime = (time) => {
+  const date = new Date(time);
+  return date.toLocaleString('zh-CN');
 };
 </script>
 
@@ -204,6 +251,123 @@ const addToCart = (goodsItem) => {
   font-size: 16px;
   color: #666;
   line-height: 1.6;
+}
+
+/* 评分统计 */
+.rating-section {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px dashed #eee;
+}
+
+.rating-section h3 {
+  font-size: 18px;
+  color: #333;
+  margin-bottom: 10px;
+}
+
+.rating-summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.avg-rating {
+  font-size: 24px;
+  font-weight: 700;
+  color: #ff6700;
+}
+
+.rating-stars {
+  font-size: 18px;
+}
+
+.rating-stars span {
+  color: #ddd;
+}
+
+.rating-stars span.active {
+  color: #ffc107;
+}
+
+.review-count {
+  font-size: 14px;
+  color: #999;
+}
+
+/* 评价列表 */
+.reviews-section {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px dashed #eee;
+}
+
+.reviews-section h3 {
+  font-size: 18px;
+  color: #333;
+  margin-bottom: 15px;
+}
+
+.empty-reviews {
+  text-align: center;
+  padding: 30px;
+  color: #999;
+  font-size: 14px;
+}
+
+.reviews-list {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.review-item {
+  padding: 15px;
+  background: #f9f9f9;
+  border-radius: 8px;
+}
+
+.review-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.review-header .user-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.review-header .nickname {
+  font-size: 14px;
+  font-weight: 500;
+  color: #333;
+}
+
+.review-header .review-rating {
+  font-size: 14px;
+}
+
+.review-header .review-rating span {
+  color: #ddd;
+}
+
+.review-header .review-rating span.active {
+  color: #ffc107;
+}
+
+.review-header .review-time {
+  font-size: 12px;
+  color: #999;
+}
+
+.review-content {
+  font-size: 14px;
+  color: #666;
+  line-height: 1.6;
+  white-space: pre-wrap;
 }
 
 /* 操作按钮 */
