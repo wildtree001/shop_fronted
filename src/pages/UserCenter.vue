@@ -191,13 +191,40 @@
             <label class="label">联系电话：</label>
             <input v-model="addressForm.phone" type="text" placeholder="请输入联系电话" class="input">
           </div>
-          <div class="form-item">
+          <div class="form-item region-item">
             <label class="label">省份/地区：</label>
-            <input v-model="addressForm.province" type="text" placeholder="请输入省份/地区" class="input">
+            <select 
+              v-model="selectedProvinceCode" 
+              @change="handleProvinceChange"
+              class="select"
+            >
+              <option value="">请选择省份</option>
+              <option 
+                v-for="p in provinceList" 
+                :key="p.code" 
+                :value="p.code"
+              >
+                {{ p.name }}
+              </option>
+            </select>
           </div>
-          <div class="form-item">
+          <div class="form-item region-item">
             <label class="label">城市：</label>
-            <input v-model="addressForm.city" type="text" placeholder="请输入城市" class="input">
+            <select 
+              v-model="selectedCityCode" 
+              @change="handleCityChange"
+              class="select"
+              :disabled="!selectedProvinceCode"
+            >
+              <option value="">请选择城市</option>
+              <option 
+                v-for="c in cityList" 
+                :key="c.code" 
+                :value="c.code"
+              >
+                {{ c.name }}
+              </option>
+            </select>
           </div>
           <div class="form-item">
             <label class="label">详细地址：</label>
@@ -218,14 +245,16 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
-import { useRouter } from 'vue-router';
+import { ref, computed, onMounted, watch } from 'vue';
+import { useRouter, useRoute } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { getCurrentUser, updateUserNickname, resetPassword } from '../data/user.js';
 import { getUserOrders } from '../data/order.js';
 import { getUserAddresses, addAddress, updateAddress, deleteAddress, setDefaultAddress } from '../data/address.js';
+import { provinces, getCitiesByProvince, getProvinceCodeByName, getCityCodeByName, getProvinceNameByCode, getCityNameByCode } from '../data/region.js';
 
 const router = useRouter();
+const route = useRoute();
 const activeTab = ref('profile');
 const currentUser = ref(null);
 const orderList = ref([]);
@@ -248,6 +277,24 @@ const addressForm = ref({
   isDefault: false
 });
 
+// 省市区联动相关
+const provinceList = ref(provinces);
+const selectedProvinceCode = ref('');
+const selectedCityCode = ref('');
+const cityList = ref([]);
+
+const handleProvinceChange = () => {
+  cityList.value = getCitiesByProvince(selectedProvinceCode.value);
+  selectedCityCode.value = '';
+  // 同步更新 addressForm
+  addressForm.value.province = getProvinceNameByCode(selectedProvinceCode.value) || '';
+  addressForm.value.city = '';
+};
+
+const handleCityChange = () => {
+  addressForm.value.city = getCityNameByCode(selectedProvinceCode.value, selectedCityCode.value) || '';
+};
+
 onMounted(() => {
   currentUser.value = getCurrentUser();
   if (!currentUser.value) {
@@ -255,8 +302,28 @@ onMounted(() => {
     router.push('/login');
     return;
   }
+  // 根据路由参数设置默认标签
+  if (route.query.tab) {
+    const validTabs = ['profile', 'orders', 'address', 'password'];
+    if (validTabs.includes(route.query.tab)) {
+      activeTab.value = route.query.tab;
+    }
+  }
   loadData();
 });
+
+// 监听路由参数变化
+watch(
+  () => route.query.tab,
+  (newTab) => {
+    if (newTab) {
+      const validTabs = ['profile', 'orders', 'address', 'password'];
+      if (validTabs.includes(newTab)) {
+        activeTab.value = newTab;
+      }
+    }
+  }
+);
 
 const loadData = () => {
   orderList.value = getUserOrders();
@@ -313,6 +380,17 @@ const handleEditAddress = (addr) => {
     detail: addr.detail,
     isDefault: addr.isDefault
   };
+  
+  // 根据名称设置省市区 code，用于联动选择
+  selectedProvinceCode.value = getProvinceCodeByName(addr.province) || '';
+  if (selectedProvinceCode.value) {
+    cityList.value = getCitiesByProvince(selectedProvinceCode.value);
+    selectedCityCode.value = getCityCodeByName(selectedProvinceCode.value, addr.city) || '';
+  } else {
+    cityList.value = [];
+    selectedCityCode.value = '';
+  }
+  
   showEditModal.value = true;
 };
 
@@ -328,6 +406,10 @@ const closeAddressModal = () => {
     detail: '',
     isDefault: false
   };
+  // 重置省市区选择
+  selectedProvinceCode.value = '';
+  selectedCityCode.value = '';
+  cityList.value = [];
 };
 
 const handleSaveAddress = () => {
@@ -839,6 +921,26 @@ const handleSetDefault = (id) => {
   margin-left: 80px;
   align-items: center;
   gap: 8px;
+}
+
+.modal-body .select {
+  flex: 1;
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  outline: none;
+  background: #fff;
+  cursor: pointer;
+}
+
+.modal-body .select:focus {
+  border-color: #ff6700;
+}
+
+.modal-body .select:disabled {
+  background: #f5f5f5;
+  cursor: not-allowed;
 }
 
 .modal-footer {
