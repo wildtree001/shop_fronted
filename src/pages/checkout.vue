@@ -30,7 +30,7 @@
         暂无收货地址，请先添加地址
       </div>
       <!-- 新增地址按钮 -->
-      <div class="add-address-btn" @click="$router.push('/user-center')">
+      <div class="add-address-btn" @click="$router.push({ path: '/user-center', query: { tab: 'address' } })">
         + 管理收货地址
       </div>
     </div>

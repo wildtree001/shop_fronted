@@ -58,8 +58,23 @@
                 去评价
               </button>
             </div>
-            <div class="goods-action" v-else>
+            <div class="goods-action reviewed" v-else>
               <span class="reviewed-tag">已评价</span>
+              <template v-if="getGoodsReview(goods.id)">
+                <div class="review-content">
+                  <div class="review-header">
+                    <span class="review-rating">
+                      <span 
+                        v-for="i in 5" 
+                        :key="i"
+                        :class="{ active: i <= getGoodsReview(goods.id).rating }"
+                      >★</span>
+                    </span>
+                    <span class="review-time">{{ formatTime(getGoodsReview(goods.id).createTime) }}</span>
+                  </div>
+                  <div class="review-text">{{ getGoodsReview(goods.id).content }}</div>
+                </div>
+              </template>
             </div>
           </div>
         </div>
@@ -104,7 +119,7 @@
 
       <div class="action-section">
         <button class="continue-btn" @click="$router.push('/')">继续购物</button>
-        <button class="center-btn" @click="$router.push('/user-center')">查看我的订单</button>
+        <button class="center-btn" @click="$router.push({ path: '/user-center', query: { tab: 'orders' } })">查看我的订单</button>
       </div>
     </div>
 
@@ -117,11 +132,12 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import { getOrderByNo } from '../data/order.js';
 import { getCurrentUser } from '../data/user.js';
+import { getReviewsByGoodsId } from '../data/review.js';
 
 const route = useRoute();
 const router = useRouter();
@@ -148,6 +164,13 @@ onMounted(() => {
     router.push('/user-center');
   }
 });
+
+const getGoodsReview = (goodsId) => {
+  if (!order.value) return null;
+  const reviews = getReviewsByGoodsId(goodsId);
+  // 找到当前订单中该商品的评价
+  return reviews.find(r => r.orderNo === order.value.orderNo) || null;
+};
 
 const formatTime = (time) => {
   const date = new Date(time);
@@ -402,6 +425,53 @@ const goToReview = (orderNo, goods) => {
   color: #999;
   border-radius: 4px;
   font-size: 14px;
+}
+
+.goods-action.reviewed {
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.goods-action.reviewed .reviewed-tag {
+  margin-bottom: 10px;
+}
+
+.review-content {
+  width: 100%;
+  padding: 12px;
+  background: #f9f9f9;
+  border-radius: 6px;
+}
+
+.review-content .review-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.review-content .review-rating {
+  font-size: 14px;
+}
+
+.review-content .review-rating span {
+  color: #ddd;
+}
+
+.review-content .review-rating span.active {
+  color: #ffc107;
+}
+
+.review-content .review-time {
+  font-size: 12px;
+  color: #999;
+}
+
+.review-content .review-text {
+  font-size: 14px;
+  color: #666;
+  line-height: 1.6;
+  white-space: pre-wrap;
 }
 
 .info-list {

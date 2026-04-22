@@ -173,7 +173,7 @@ const handleSubmit = () => {
       const orderResult = markGoodsReviewed(orderNo.value, goodsId.value);
       if (orderResult.success) {
         ElMessage.success('评价提交成功！');
-        router.push('/user-center');
+        router.push(`/order-detail/${orderNo.value}`);
       } else {
         ElMessage.error(orderResult.msg);
       }
