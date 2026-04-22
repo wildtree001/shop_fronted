@@ -11,35 +11,27 @@
       <div class="section-title">收货地址</div>
       <!-- 地址列表 -->
       <div class="address-list">
-        <!-- 默认地址（高亮） -->
         <div 
           class="address-item" 
-          :class="{ active: selectedAddress.id === defaultAddress.id }"
-          @click="selectedAddress = defaultAddress"
+          v-for="addr in addressList" 
+          :key="addr.id"
+          :class="{ active: selectedAddress.id === addr.id }"
+          @click="selectedAddress = addr"
         >
           <div class="address-header">
-            <span class="username">{{ defaultAddress.username }}</span>
-            <span class="phone">{{ defaultAddress.phone }}</span>
-            <span class="default-tag" v-if="selectedAddress.id === defaultAddress.id">默认</span>
+            <span class="username">{{ addr.username }}</span>
+            <span class="phone">{{ addr.phone }}</span>
+            <span class="default-tag" v-if="addr.isDefault">默认</span>
           </div>
-          <div class="address-detail">{{ defaultAddress.province }} {{ defaultAddress.city }} {{ defaultAddress.detail }}</div>
-        </div>
-        <!-- 其他地址-->
-        <div 
-          class="address-item" 
-          :class="{ active: selectedAddress.id === otherAddress.id }"
-          @click="selectedAddress = otherAddress"
-        >
-          <div class="address-header">
-            <span class="username">{{ otherAddress.username }}</span>
-            <span class="phone">{{ otherAddress.phone }}</span>
-          </div>
-          <div class="address-detail">{{ otherAddress.province }} {{ otherAddress.city }} {{ otherAddress.detail }}</div>
+          <div class="address-detail">{{ addr.province }} {{ addr.city }} {{ addr.detail }}</div>
         </div>
       </div>
+      <div v-if="addressList.length === 0" class="empty-address">
+        暂无收货地址，请先添加地址
+      </div>
       <!-- 新增地址按钮 -->
-      <div class="add-address-btn" @click="ElMessage.info('新增地址功能待开发～')">
-        + 新增收货地址
+      <div class="add-address-btn" @click="$router.push('/user-center')">
+        + 管理收货地址
       </div>
     </div>
 
@@ -104,6 +96,7 @@ import { useRouter, useRoute } from 'vue-router';
 
 import { useCartStore } from '../store/cart.js';
 import { getCurrentUser } from '../data/user.js';
+import { getUserAddresses } from '../data/address.js';
 
 const cartStore = useCartStore();
 const router = useRouter();
@@ -111,23 +104,8 @@ const route = useRoute(); // 新增：获取路由参数
 const currentUser = ref(null); // 当前登录用户
 const isOrderSubmitted = ref(false); // 标记是否已提交订单
 
-const defaultAddress = ref({
-  id: 1,
-  username: '张三',
-  phone: '13800138000',
-  province: '西安市',
-  city: '西安市',
-  detail: '邮电大学1号楼1单元101'
-});
-const otherAddress = ref({
-  id: 2,
-  username: '张三',
-  phone: '13900139000',
-  province: '上海市',
-  city: '上海市',
-  detail: '浦东新区某某路888号'
-});
-const selectedAddress = ref({ ...defaultAddress.value });
+const addressList = ref([]); // 地址列表
+const selectedAddress = ref({}); // 选中的地址
 
 onMounted(() => {
   // 检查登录状态
@@ -136,6 +114,13 @@ onMounted(() => {
     ElMessage.warning('请先登录后再结算～');
     router.push('/login');
     return;
+  }
+  // 加载地址数据
+  addressList.value = getUserAddresses();
+  if (addressList.value.length > 0) {
+    // 默认选中第一个地址，优先选中默认地址
+    const defaultAddr = addressList.value.find(a => a.isDefault) || addressList.value[0];
+    selectedAddress.value = { ...defaultAddr };
   }
   // 加载购物车数据
   cartStore.loadUserCart();
@@ -154,6 +139,10 @@ const submitOrder = () => {
   }
   if (cartStore.goodsList.length === 0) {
     ElMessage.warning('购物车为空，无法提交订单！');
+    return;
+  }
+  if (!selectedAddress.value || !selectedAddress.value.id) {
+    ElMessage.warning('请先选择或添加收货地址！');
     return;
   }
 
@@ -260,6 +249,13 @@ const goToPay = () => {
   border: 1px dashed #ff6700;
   border-radius: 4px;
   cursor: pointer;
+}
+
+.empty-address {
+  text-align: center;
+  padding: 20px;
+  color: #999;
+  font-size: 14px;
 }
 
 /* 商品清单样式 */

@@ -96,6 +96,8 @@ import { useCartStore } from '../store/cart.js'
 import { ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { createOrder } from '../data/order.js'
+import { getUserAddresses } from '../data/address.js'
 
 // 2. 初始化实例
 const cartStore = useCartStore()
@@ -107,26 +109,10 @@ const selectedPayMethod = ref('wechat') // 选中的支付方式
 const payPassword = ref('') // 支付密码
 const showModal = ref(false) // 支付结果弹窗
 const payResult = ref({ type: '', text: '', icon: '' }) // 支付结果
+const createdOrderNo = ref('') // 支付成功后创建的订单号
 
-// 4. 地址数据（和结算页保持一致）
-const addressList = ref([
-  {
-    id: 1,
-    username: '张三',
-    phone: '13800138000',
-    province: '北京市',
-    city: '北京市',
-    detail: '朝阳区某某小区1号楼1单元101'
-  },
-  {
-    id: 2,
-    username: '张三',
-    phone: '13900139000',
-    province: '上海市',
-    city: '上海市',
-    detail: '浦东新区某某路888号'
-  }
-])
+// 4. 地址数据
+const addressList = ref([])
 const currentAddress = ref({}) // 当前选中的地址
 
 // 5. 支付方式列表（本地图标兜底，避免网络失效）
@@ -170,7 +156,15 @@ onMounted(() => {
     return
   }
 
-  // 4. 匹配收货地址
+  // 4. 加载用户地址数据
+  addressList.value = getUserAddresses()
+  if (addressList.value.length === 0) {
+    ElMessage.warning('请先添加收货地址')
+    router.push('/checkout')
+    return
+  }
+
+  // 5. 匹配收货地址
   currentAddress.value = addressList.value.find(item => item.id === addressId) || addressList.value[0]
 })
 
@@ -192,15 +186,32 @@ const handlePay = () => {
     return
   }
 
-  // 支付成功：删除购物车中已支付的商品
-  const payGoodsIds = payGoodsList.value.map(item => item.id)
-  cartStore.goodsList = cartStore.goodsList.filter(goods => !payGoodsIds.includes(goods.id))
-  
-  // 更新支付结果
-  payResult.value = {
-    type: 'success',
-    text: '支付成功！感谢您的购买',
-    icon: 'https://img.icons8.com/fluency/48/00ff00/checkmark.png'
+  // 支付成功：创建订单记录
+  const orderResult = createOrder(
+    payGoodsList.value,
+    currentAddress.value,
+    selectedPayMethod.value
+  )
+
+  if (orderResult.success) {
+    createdOrderNo.value = orderResult.order.orderNo
+
+    // 删除购物车中已支付的商品
+    const payGoodsIds = payGoodsList.value.map(item => item.id)
+    cartStore.goodsList = cartStore.goodsList.filter(goods => !payGoodsIds.includes(goods.id))
+
+    // 更新支付结果
+    payResult.value = {
+      type: 'success',
+      text: `支付成功！订单号：${orderResult.order.orderNo}`,
+      icon: 'https://img.icons8.com/fluency/48/00ff00/checkmark.png'
+    }
+  } else {
+    payResult.value = {
+      type: 'fail',
+      text: orderResult.msg,
+      icon: 'https://img.icons8.com/fluency/48/ff0000/error.png'
+    }
   }
   showModal.value = true
 }
@@ -208,14 +219,12 @@ const handlePay = () => {
 // 9. 处理弹窗关闭
 const handleModalClose = () => {
   showModal.value = false
-  if (payResult.value.type === 'success') {
-    // 支付成功返回首页
-    router.push('/')
+  if (payResult.value.type === 'success' && createdOrderNo.value) {
+    // 支付成功跳转到订单详情页
+    router.push(`/order-detail/${createdOrderNo.value}`)
   } else {
     // 支付失败清空密码
     payPassword.value = ''
-    console.log('密码错误');
-    
   }
 }
 </script>

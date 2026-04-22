@@ -57,3 +57,61 @@ const getUsers = () => {
     return { success: true, msg: '退出成功！' };
   };
 
+  // 修改用户昵称
+  export const updateUserNickname = (newNickname) => {
+    const currentUser = getCurrentUser();
+    if (!currentUser) {
+      return { success: false, msg: '请先登录！' };
+    }
+
+    const users = getUsers();
+    const userIndex = users.findIndex(u => u.username === currentUser.username);
+    
+    if (userIndex === -1) {
+      return { success: false, msg: '用户不存在！' };
+    }
+
+    users[userIndex].nickname = newNickname;
+    saveUsers(users);
+
+    const updatedUser = {
+      username: currentUser.username,
+      nickname: newNickname
+    };
+    localStorage.setItem('currentUser', JSON.stringify(updatedUser));
+
+    return { success: true, msg: '昵称修改成功！', user: updatedUser };
+  };
+
+  // 重置密码
+  export const resetPassword = (oldPassword, newPassword) => {
+    const currentUser = getCurrentUser();
+    if (!currentUser) {
+      return { success: false, msg: '请先登录！' };
+    }
+
+    if (!oldPassword || !newPassword) {
+      return { success: false, msg: '密码不能为空！' };
+    }
+
+    if (newPassword.length < 6) {
+      return { success: false, msg: '新密码长度不能少于6位！' };
+    }
+
+    const users = getUsers();
+    const userIndex = users.findIndex(u => u.username === currentUser.username);
+    
+    if (userIndex === -1) {
+      return { success: false, msg: '用户不存在！' };
+    }
+
+    if (users[userIndex].password !== oldPassword) {
+      return { success: false, msg: '原密码错误！' };
+    }
+
+    users[userIndex].password = newPassword;
+    saveUsers(users);
+
+    return { success: true, msg: '密码修改成功！' };
+  };
+
