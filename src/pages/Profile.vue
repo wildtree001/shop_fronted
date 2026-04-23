@@ -23,12 +23,12 @@
           </div>
         </div>
         <div class="points-info">
-          <div class="points-item">
+          <div class="points-item" @click="activeTab = 'pointsHistory'" style="cursor: pointer;">
             <span class="points-value">{{ userProfile.points }}</span>
             <span class="points-label">积分</span>
           </div>
           <div class="points-item">
-            <span class="points-value">{{ userProfile.totalSpent.toFixed(0) }}</span>
+            <span class="points-value">{{ formatExp(userProfile.totalSpent) }}</span>
             <span class="points-label">累计消费(元)</span>
           </div>
         </div>
@@ -39,7 +39,7 @@
         <div class="progress-info">
           <span class="current-level">{{ memberLevelInfo.name }}</span>
           <span class="exp-info">
-            当前经验值：{{ userProfile.memberLevelExp }}
+            当前经验值：{{ formatExp(userProfile.memberLevelExp) }}
             <span v-if="nextLevelInfo">
               / 下一等级需 {{ nextLevelInfo.minExp }}
             </span>
@@ -90,7 +90,12 @@
         <div class="action-item" @click="activeTab = 'coupons'">
           <span class="action-icon">🎫</span>
           <span class="action-text">我的券包</span>
-          <span class="action-count">{{ userProfile.coupons.length }}张</span>
+          <span class="action-count">{{ userProfile.coupons.filter(c => !c.isUsed).length }}张</span>
+        </div>
+        <div class="action-item" @click="activeTab = 'pointsHistory'">
+          <span class="action-icon">📝</span>
+          <span class="action-text">积分记录</span>
+          <span class="action-count">{{ userProfile.pointsHistory?.length || 0 }}条</span>
         </div>
         <div class="action-item" @click="activeTab = 'dashboard'">
           <span class="action-icon">📊</span>
@@ -137,15 +142,41 @@
           <div class="mall-header">
             <span class="current-points">当前积分：<strong>{{ userProfile.points }}</strong></span>
           </div>
+          <div class="coupon-filters">
+            <div 
+              class="filter-item" 
+              :class="{ active: couponFilterType === 'all' }"
+              @click="couponFilterType = 'all'"
+            >
+              全部
+            </div>
+            <div 
+              class="filter-item" 
+              :class="{ active: couponFilterType === 'voucher' }"
+              @click="couponFilterType = 'voucher'"
+            >
+              🎫 代金券
+            </div>
+            <div 
+              class="filter-item" 
+              :class="{ active: couponFilterType === 'gift' }"
+              @click="couponFilterType = 'gift'"
+            >
+              🎁 礼品券
+            </div>
+          </div>
           <div class="coupons-grid">
             <div 
-              v-for="coupon in COUPON_DEFINITIONS" 
+              v-for="coupon in filteredCoupons" 
               :key="coupon.id"
               class="coupon-card"
             >
               <div class="coupon-left">
                 <span class="coupon-icon">{{ coupon.icon }}</span>
                 <span class="coupon-value">¥{{ coupon.discountAmount }}</span>
+                <span class="coupon-type-tag" :style="getCouponTypeStyle(coupon.type)">
+                  {{ COUPON_TYPE_INFO[coupon.type].name }}
+                </span>
               </div>
               <div class="coupon-middle">
                 <span class="coupon-name">{{ coupon.name }}</span>
@@ -156,7 +187,7 @@
                 <button 
                   class="exchange-btn" 
                   :disabled="userProfile.points < coupon.pointsCost"
-                  @click="exchangeCoupon(coupon)"
+                  @click="confirmExchange(coupon)"
                 >
                   {{ coupon.pointsCost }}积分兑换
                 </button>
@@ -165,9 +196,34 @@
           </div>
         </div>
 
+        <div v-if="activeTab === 'pointsHistory'" class="points-history-section">
+          <h4 class="section-title">积分变更记录</h4>
+          <div v-if="userProfile.pointsHistory?.length === 0" class="empty-tip">
+            暂无积分变更记录
+          </div>
+          <div v-else class="points-history-list">
+            <div 
+              v-for="record in sortedPointsHistory" 
+              :key="record.id"
+              class="points-history-item"
+            >
+              <div class="record-icon" :style="getPointsHistoryTypeStyle(record.type)">
+                {{ POINTS_HISTORY_TYPES[record.type].icon }}
+              </div>
+              <div class="record-info">
+                <span class="record-desc">{{ record.description }}</span>
+                <span class="record-time">{{ formatDate(record.createdAt) }}</span>
+              </div>
+              <div class="record-amount" :class="record.type">
+                {{ record.type === 'earn' ? '+' : '-' }}{{ record.amount }}
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div v-if="activeTab === 'coupons'" class="coupons-section">
           <h4 class="section-title">我的券包</h4>
-          <div v-if="userProfile.coupons.length === 0" class="empty-tip">
+          <div v-if="userProfile.coupons.filter(c => !c.isUsed).length === 0" class="empty-tip">
             暂无可用优惠券，快去积分商城兑换吧～
           </div>
           <div v-else class="my-coupons-grid">
@@ -175,6 +231,7 @@
               v-for="(coupon, index) in userProfile.coupons" 
               :key="index"
               class="my-coupon-card"
+              :class="{ used: coupon.isUsed }"
             >
               <div class="my-coupon-left">
                 <span class="my-coupon-value">¥{{ coupon.discountAmount }}</span>
@@ -183,7 +240,9 @@
               <div class="my-coupon-right">
                 <span class="my-coupon-desc">{{ coupon.description }}</span>
                 <span class="my-coupon-valid">有效期至：{{ formatDate(coupon.validUntil) }}</span>
-                <span class="my-coupon-status">未使用</span>
+                <span class="my-coupon-status" :class="{ used: coupon.isUsed }">
+                  {{ coupon.isUsed ? '已使用' : '未使用' }}
+                </span>
               </div>
             </div>
           </div>
@@ -201,7 +260,7 @@
               <span class="stat-label">购买商品数</span>
             </div>
             <div class="stat-card">
-              <span class="stat-value">{{ userProfile.totalSpent.toFixed(0) }}</span>
+              <span class="stat-value">{{ formatExp(userProfile.totalSpent) }}</span>
               <span class="stat-label">累计消费(元)</span>
             </div>
             <div class="stat-card">
@@ -251,7 +310,7 @@
                   <img :src="goods.img" :alt="goods.name" class="goods-img">
                   <div class="goods-info">
                     <span class="goods-name">{{ goods.name }}</span>
-                    <span class="goods-spec">数量：{{ goods.count }} | 单价：¥{{ goods.price }}</span>
+                    <span class="goods-spec">数量：{{ goods.count }} | 原价：¥{{ goods.price }} | 会员价：¥{{ getMemberPrice(goods.price) }}</span>
                   </div>
                 </div>
               </div>
@@ -264,6 +323,26 @@
               </div>
             </div>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-mask" v-if="showExchangeModal">
+      <div class="modal-content">
+        <h3 class="modal-title">确认兑换</h3>
+        <div class="modal-body">
+          <div class="coupon-preview">
+            <span class="preview-icon">{{ selectedCouponForExchange?.icon }}</span>
+            <span class="preview-name">{{ selectedCouponForExchange?.name }}</span>
+          </div>
+          <p class="exchange-info">
+            确认使用 <strong>{{ selectedCouponForExchange?.pointsCost }}</strong> 积分兑换此优惠券吗？
+          </p>
+          <p class="exchange-note">当前积分：{{ userProfile.points }}，兑换后剩余：{{ userProfile.points - (selectedCouponForExchange?.pointsCost || 0) }}</p>
+        </div>
+        <div class="modal-buttons">
+          <button class="cancel-btn" @click="cancelExchange">取消</button>
+          <button class="confirm-btn" @click="doExchange">确认兑换</button>
         </div>
       </div>
     </div>
@@ -282,13 +361,21 @@ import {
   MEMBER_LEVELS,
   BADGE_DEFINITIONS,
   RARITY_INFO,
-  COUPON_DEFINITIONS
+  COUPON_DEFINITIONS,
+  COUPON_TYPE_INFO,
+  POINTS_HISTORY_TYPES,
+  createPointsHistory,
+  calculateDiscountPrice,
+  formatExp
 } from '../data/userProfile.js';
 
 const router = useRouter();
 const currentUser = ref(null);
 const userProfile = ref(null);
 const activeTab = ref('badges');
+const couponFilterType = ref('all');
+const showExchangeModal = ref(false);
+const selectedCouponForExchange = ref(null);
 
 const trendChartRef = ref(null);
 const categoryChartRef = ref(null);
@@ -328,6 +415,20 @@ const sortedOrders = computed(() => {
   if (!userProfile.value) return [];
   return [...userProfile.value.orders].sort((a, b) => 
     new Date(b.orderTime) - new Date(a.orderTime)
+  );
+});
+
+const filteredCoupons = computed(() => {
+  if (couponFilterType.value === 'all') {
+    return COUPON_DEFINITIONS;
+  }
+  return COUPON_DEFINITIONS.filter(c => c.type === couponFilterType.value);
+});
+
+const sortedPointsHistory = computed(() => {
+  if (!userProfile.value || !userProfile.value.pointsHistory) return [];
+  return [...userProfile.value.pointsHistory].sort((a, b) => 
+    new Date(b.createdAt) - new Date(a.createdAt)
   );
 });
 
@@ -377,6 +478,28 @@ const getRarityStyle = (rarity) => {
   };
 };
 
+const getCouponTypeStyle = (type) => {
+  const info = COUPON_TYPE_INFO[type];
+  return {
+    color: info.color,
+    background: 'rgba(' + 
+      (type === 'voucher' ? '24,144,255' : '82,196,26') + ',0.1)'
+  };
+};
+
+const getPointsHistoryTypeStyle = (type) => {
+  const info = POINTS_HISTORY_TYPES[type];
+  return {
+    color: info.color,
+    background: type === 'earn' ? '#f6ffed' : '#fff2f0'
+  };
+};
+
+const getMemberPrice = (originalPrice) => {
+  if (!userProfile.value) return originalPrice.toFixed(2);
+  return calculateDiscountPrice(originalPrice, userProfile.value.memberLevel).toFixed(2);
+};
+
 const formatBadgeUnlockTime = (badgeId) => {
   if (!userProfile.value) return '';
   const badge = userProfile.value.badges.find(b => b.id === badgeId);
@@ -396,13 +519,25 @@ const formatDate = (dateStr) => {
   });
 };
 
-const exchangeCoupon = (coupon) => {
+const confirmExchange = (coupon) => {
   if (!userProfile.value) return;
   if (userProfile.value.points < coupon.pointsCost) {
     ElMessage.warning('积分不足！');
     return;
   }
+  selectedCouponForExchange.value = coupon;
+  showExchangeModal.value = true;
+};
 
+const cancelExchange = () => {
+  showExchangeModal.value = false;
+  selectedCouponForExchange.value = null;
+};
+
+const doExchange = () => {
+  if (!selectedCouponForExchange.value || !userProfile.value) return;
+  
+  const coupon = selectedCouponForExchange.value;
   const validUntil = new Date();
   validUntil.setDate(validUntil.getDate() + coupon.validDays);
 
@@ -413,11 +548,24 @@ const exchangeCoupon = (coupon) => {
     isUsed: false
   };
 
+  const pointsHistory = createPointsHistory(
+    'spend',
+    coupon.pointsCost,
+    `兑换${coupon.name}`
+  );
+
   userProfile.value.points -= coupon.pointsCost;
   userProfile.value.coupons.push(newCoupon);
   userProfile.value.redeemedCoupons.push(newCoupon);
+  if (!userProfile.value.pointsHistory) {
+    userProfile.value.pointsHistory = [];
+  }
+  userProfile.value.pointsHistory.push(pointsHistory);
 
   updateUserProfile(userProfile.value);
+  
+  showExchangeModal.value = false;
+  selectedCouponForExchange.value = null;
   ElMessage.success(`成功兑换【${coupon.name}】！`);
 };
 
@@ -493,8 +641,8 @@ const initCharts = () => {
   const heatmapData = [];
   for (let day = 0; day < 7; day++) {
     for (let hour = 0; hour < 24; hour++) {
-      const count = (hourDist[hour] || 0) + (day === new Date().getDay() ? 1 : 0);
-      heatmapData.push([hour, day, count > 0 ? count : 0]);
+      const count = (hourDist[hour] || 0);
+      heatmapData.push([hour, day, count]);
     }
   }
 
@@ -750,7 +898,7 @@ const initCharts = () => {
 
 .quick-actions {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(6, 1fr);
   gap: 15px;
   margin-bottom: 20px;
 }
@@ -883,6 +1031,31 @@ const initCharts = () => {
   font-size: 20px;
 }
 
+.coupon-filters {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.filter-item {
+  padding: 8px 20px;
+  background: #f5f5f5;
+  border-radius: 20px;
+  cursor: pointer;
+  font-size: 14px;
+  color: #666;
+  transition: all 0.3s;
+}
+
+.filter-item:hover {
+  background: #e8e8e8;
+}
+
+.filter-item.active {
+  background: #ff6700;
+  color: #fff;
+}
+
 .coupons-grid {
   display: flex;
   flex-direction: column;
@@ -906,18 +1079,26 @@ const initCharts = () => {
   align-items: center;
   padding-right: 20px;
   border-right: 2px dashed #ffcccc;
-  min-width: 100px;
+  min-width: 120px;
+  position: relative;
 }
 
 .coupon-icon {
-  font-size: 24px;
-  margin-bottom: 4px;
+  font-size: 20px;
+  margin-bottom: 2px;
 }
 
 .coupon-value {
   font-size: 28px;
   font-weight: 700;
   color: #ff4d4f;
+}
+
+.coupon-type-tag {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  margin-top: 4px;
 }
 
 .coupon-middle {
@@ -976,6 +1157,70 @@ const initCharts = () => {
   font-size: 16px;
 }
 
+.points-history-section {
+}
+
+.points-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.points-history-item {
+  display: flex;
+  align-items: center;
+  padding: 15px 20px;
+  background: #fafafa;
+  border-radius: 8px;
+  transition: background 0.3s;
+}
+
+.points-history-item:hover {
+  background: #f5f5f5;
+}
+
+.record-icon {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-size: 18px;
+  margin-right: 15px;
+}
+
+.record-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.record-desc {
+  font-size: 14px;
+  color: #333;
+  font-weight: 500;
+}
+
+.record-time {
+  font-size: 12px;
+  color: #999;
+}
+
+.record-amount {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.record-amount.earn {
+  color: #52c41a;
+}
+
+.record-amount.spend {
+  color: #ff4d4f;
+}
+
 .my-coupons-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -988,6 +1233,11 @@ const initCharts = () => {
   border: 1px solid #ffe0e0;
   border-radius: 12px;
   overflow: hidden;
+  transition: opacity 0.3s;
+}
+
+.my-coupon-card.used {
+  opacity: 0.5;
 }
 
 .my-coupon-left {
@@ -1035,6 +1285,10 @@ const initCharts = () => {
   font-size: 12px;
   color: #52c41a;
   font-weight: 500;
+}
+
+.my-coupon-status.used {
+  color: #999;
 }
 
 .dashboard-stats {
@@ -1201,6 +1455,110 @@ const initCharts = () => {
   color: #ff6700;
 }
 
+.modal-mask {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+}
+
+.modal-content {
+  background: #fff;
+  border-radius: 12px;
+  padding: 30px;
+  text-align: center;
+  width: 360px;
+  max-width: 90%;
+}
+
+.modal-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 20px;
+}
+
+.modal-body {
+  margin-bottom: 25px;
+}
+
+.coupon-preview {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px;
+  background: linear-gradient(135deg, #fff5f5 0%, #fff 100%);
+  border-radius: 8px;
+  margin-bottom: 15px;
+}
+
+.preview-icon {
+  font-size: 32px;
+  margin-bottom: 8px;
+}
+
+.preview-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+}
+
+.exchange-info {
+  font-size: 14px;
+  color: #666;
+  margin-bottom: 10px;
+}
+
+.exchange-info strong {
+  color: #ff6700;
+  font-size: 16px;
+}
+
+.exchange-note {
+  font-size: 13px;
+  color: #999;
+}
+
+.modal-buttons {
+  display: flex;
+  gap: 15px;
+  justify-content: center;
+}
+
+.modal-buttons .cancel-btn,
+.modal-buttons .confirm-btn {
+  padding: 12px 40px;
+  border-radius: 6px;
+  font-size: 14px;
+  border: none;
+  cursor: pointer;
+  transition: background 0.3s;
+}
+
+.modal-buttons .cancel-btn {
+  background: #f5f5f5;
+  color: #666;
+}
+
+.modal-buttons .cancel-btn:hover {
+  background: #e8e8e8;
+}
+
+.modal-buttons .confirm-btn {
+  background: #ff6700;
+  color: #fff;
+}
+
+.modal-buttons .confirm-btn:hover {
+  background: #ff8800;
+}
+
 @media (max-width: 767px) {
   .user-card {
     flex-direction: column;
@@ -1218,7 +1576,7 @@ const initCharts = () => {
   }
 
   .quick-actions {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(3, 1fr);
   }
 
   .badges-grid {

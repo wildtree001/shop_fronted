@@ -61,7 +61,13 @@
           <router-link :to="`/goods/${goods.id}`" class="goods-name-link">
             <div class="goods-name">{{ goods.name }}</div>
           </router-link>
-          <div class="goods-price">¥{{ goods.price }}.00</div>
+          <div class="goods-price-container">
+            <span class="goods-price-original" v-if="userProfile && userProfile.memberLevel !== 'bronze'">¥{{ goods.price }}.00</span>
+            <span class="goods-price">
+              ¥{{ getMemberPrice(goods.price) }}
+              <span v-if="userProfile && userProfile.memberLevel !== 'bronze'" class="vip-tag">VIP价</span>
+            </span>
+          </div>
           <div 
             class="add-cart-btn" 
             @click="addToCart(goods)"
@@ -83,21 +89,28 @@ import { goodsList, categoryList } from '../data/goods.js';
 import { ref, computed, onMounted, watch } from 'vue';
 import { getCurrentUser, logoutUser } from '../data/user.js';
 import { useRouter } from 'vue-router';
+import { getOrCreateUserProfile, calculateDiscountPrice } from '../data/userProfile.js';
 
 const cartStore = useCartStore();
 const currentCategory = ref("全部");
 const searchKeyword = ref("");
 const currentUser = ref(null);
+const userProfile = ref(null);
 const router = useRouter();
 
 onMounted(() => {
   currentUser.value = getCurrentUser();
+  if (currentUser.value) {
+    userProfile.value = getOrCreateUserProfile();
+  }
   cartStore.loadUserCart();
   
   watch(currentUser, (newUser) => {
     if(newUser){
+      userProfile.value = getOrCreateUserProfile();
       cartStore.loadUserCart();
     }else{
+      userProfile.value = null;
       cartStore.clearCartMemoryOnly();
     }
   }, { immediate: true, deep: true });
@@ -150,6 +163,13 @@ const handleLogout = () => {
   currentUser.value = null;
   cartStore.clearCartMemoryOnly();
   ElMessage.success("退出登录成功！");
+};
+
+const getMemberPrice = (originalPrice) => {
+  if (!userProfile.value) {
+    return originalPrice.toFixed(2);
+  }
+  return calculateDiscountPrice(originalPrice, userProfile.value.memberLevel).toFixed(2);
 };
 </script>
 
@@ -351,11 +371,36 @@ const handleLogout = () => {
   line-height: 1.4;
   transition: color 0.2s ease; /* 颜色过渡 */
 }
+.goods-price-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
 .goods-price {
   font-size: 18px;
   color: #ff6700;
   font-weight: 700;
-  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.goods-price-original {
+  font-size: 14px;
+  color: #999;
+  text-decoration: line-through;
+  margin-bottom: 2px;
+}
+
+.vip-tag {
+  font-size: 11px;
+  padding: 2px 6px;
+  background: linear-gradient(135deg, #ff6b6b 0%, #ff4d4f 100%);
+  color: #fff;
+  border-radius: 3px;
+  font-weight: 500;
 }
 .add-cart-btn {
   width: 100%;

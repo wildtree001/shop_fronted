@@ -22,9 +22,19 @@
         <div class="col-check"><input type="checkbox" v-model="checkedGoodsIds" :value="goods.id"></div>
         <div class="col-goods">
           <img :src="goods.img" alt="商品图" class="goods-img">
-          <div class="goods-name">{{ goods.name }}</div>
+          <div class="goods-info">
+            <div class="goods-name">{{ goods.name }}</div>
+            <div class="goods-price-row" v-if="userProfile && userProfile.memberLevel !== 'bronze'">
+              <span class="goods-price-original">¥{{ goods.price }}</span>
+              <span class="goods-price-member">¥{{ getMemberPrice(goods.price) }}</span>
+              <span class="vip-tag">VIP价</span>
+            </div>
+          </div>
         </div>
-        <div class="col-price">¥{{ goods.price }}</div>
+        <div class="col-price">
+          <span v-if="userProfile && userProfile.memberLevel !== 'bronze'" class="price-member">¥{{ getMemberPrice(goods.price) }}</span>
+          <span v-else class="price-original">¥{{ goods.price }}</span>
+        </div>
         <div class="col-count">
           <button class="count-btn" @click="changeCount(goods.id, -1)" :disabled="goods.count <= 1">-</button>
           <span class="count-num">{{ goods.count }}</span>
@@ -63,17 +73,22 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { getCurrentUser } from '../data/user.js'
+import { getOrCreateUserProfile, calculateDiscountPrice } from '../data/userProfile.js'
 
 // 2. 初始化核心实例
 const cartStore = useCartStore()
 const router = useRouter()
 const currentUser = ref(null)
+const userProfile = ref(null)
 const checkedGoodsIds = ref([])
 
 // 3. 页面挂载：核心修复（仅加载一次，不重复触发响应式）
 onMounted(() => {
   // 1. 获取当前登录用户（必做：匹配用户专属购物车）
   currentUser.value = getCurrentUser()
+  if (currentUser.value) {
+    userProfile.value = getOrCreateUserProfile()
+  }
   
   // 2. 兜底加载购物车（仅仓库为空时加载，避免覆盖已有数据）
   if (cartStore.goodsList.length === 0) {
@@ -83,7 +98,10 @@ onMounted(() => {
   // 3. 监听用户状态变化：切换用户时重新加载购物车
   watch(currentUser, (newUser) => {
     if (newUser) {
+      userProfile.value = getOrCreateUserProfile()
       cartStore.loadUserCart()
+    } else {
+      userProfile.value = null
     }
   }, { immediate: true })
 
@@ -129,7 +147,14 @@ const deleteGoods = (id) => {
 const calculateTotalPrice = () => {
   return cartStore.goodsList
     .filter(item => checkedGoodsIds.value.includes(item.id))
-    .reduce((sum, item) => sum + item.price * (item.count || 1), 0)
+    .reduce((sum, item) => sum + getMemberPrice(item.price) * (item.count || 1), 0)
+}
+
+const getMemberPrice = (originalPrice) => {
+  if (!userProfile.value) {
+    return originalPrice
+  }
+  return calculateDiscountPrice(originalPrice, userProfile.value.memberLevel)
 }
 
 // 8. 跳转结算页：登录校验+选中校验
@@ -232,6 +257,11 @@ const goToCheckout = () => {
   border-radius: 4px;
   margin-right: 10px;
 }
+.goods-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
 .goods-name {
   font-size: 14px;
   color: #333;
@@ -239,6 +269,38 @@ const goToCheckout = () => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.goods-price-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.goods-price-original {
+  font-size: 12px;
+  color: #999;
+  text-decoration: line-through;
+}
+.goods-price-member {
+  font-size: 14px;
+  color: #ff6700;
+  font-weight: 600;
+}
+.price-member {
+  font-size: 14px;
+  color: #ff6700;
+  font-weight: 700;
+}
+.price-original {
+  font-size: 14px;
+  color: #333;
+}
+.vip-tag {
+  font-size: 10px;
+  padding: 1px 4px;
+  background: linear-gradient(135deg, #ff6b6b 0%, #ff4d4f 100%);
+  color: #fff;
+  border-radius: 2px;
+  font-weight: 500;
 }
 .count-btn {
   width: 28px;
