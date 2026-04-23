@@ -315,10 +315,29 @@
                 </div>
               </div>
               <div class="order-footer">
+                <div class="order-discounts" v-if="order.totalDiscount > 0">
+                  <div class="discount-item" v-if="order.memberDiscount > 0">
+                    <span class="discount-label">会员优惠：</span>
+                    <span class="discount-value">-¥{{ order.memberDiscount.toFixed(2) }}</span>
+                  </div>
+                  <div class="discount-item" v-if="order.couponDiscount > 0">
+                    <span class="discount-label">优惠券优惠：</span>
+                    <span class="discount-value">-¥{{ order.couponDiscount.toFixed(2) }}</span>
+                    <span class="coupon-name" v-if="order.usedCoupon">({{ order.usedCoupon.name }})</span>
+                  </div>
+                </div>
                 <div class="order-amount">
-                  <span>原价：¥{{ order.originalAmount.toFixed(2) }}</span>
-                  <span v-if="order.discountAmount > 0">优惠：-¥{{ order.discountAmount.toFixed(2) }}</span>
+                  <span class="original-price">原价：¥{{ order.originalAmount.toFixed(2) }}</span>
+                  <span class="total-discount" v-if="order.totalDiscount > 0">总优惠：-¥{{ order.totalDiscount.toFixed(2) }}</span>
                   <span class="paid-amount">实付：¥{{ order.paidAmount.toFixed(2) }}</span>
+                </div>
+                <div class="order-extra-info" v-if="order.memberLevel || order.earnedPoints">
+                  <span class="member-level-tag" v-if="order.memberLevel">
+                    {{ getLevelIcon(order.memberLevel) }}{{ MEMBER_LEVELS[order.memberLevel]?.name }}会员
+                  </span>
+                  <span class="earned-points-tag" v-if="order.earnedPoints">
+                    获得积分：<strong>{{ order.earnedPoints }}</strong>
+                  </span>
                 </div>
               </div>
             </div>
@@ -1437,11 +1456,47 @@ const initCharts = () => {
   border-top: 1px solid #eee;
 }
 
+.order-discounts {
+  margin-bottom: 12px;
+  padding: 10px 15px;
+  background: #fff;
+  border-radius: 6px;
+  border: 1px dashed #e0e0e0;
+}
+
+.discount-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: 6px;
+}
+
+.discount-item:last-child {
+  margin-bottom: 0;
+}
+
+.discount-label {
+  font-size: 13px;
+  color: #666;
+}
+
+.discount-value {
+  font-size: 13px;
+  color: #52c41a;
+  font-weight: 600;
+}
+
+.coupon-name {
+  font-size: 12px;
+  color: #999;
+}
+
 .order-amount {
   display: flex;
   align-items: center;
   gap: 20px;
   justify-content: flex-end;
+  margin-bottom: 10px;
 }
 
 .order-amount span {
@@ -1449,10 +1504,49 @@ const initCharts = () => {
   color: #666;
 }
 
+.order-amount .original-price {
+  color: #999;
+  text-decoration: line-through;
+}
+
+.order-amount .total-discount {
+  color: #52c41a;
+}
+
 .order-amount .paid-amount {
   font-size: 16px;
   font-weight: 700;
   color: #ff6700;
+}
+
+.order-extra-info {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 15px;
+  padding-top: 10px;
+  border-top: 1px dashed #e0e0e0;
+}
+
+.member-level-tag {
+  font-size: 12px;
+  padding: 3px 10px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #fff;
+  border-radius: 4px;
+}
+
+.earned-points-tag {
+  font-size: 12px;
+  padding: 3px 10px;
+  background: #fff7e6;
+  color: #ff6700;
+  border-radius: 4px;
+}
+
+.earned-points-tag strong {
+  font-size: 14px;
+  font-weight: 700;
 }
 
 .modal-mask {
