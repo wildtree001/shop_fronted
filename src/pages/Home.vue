@@ -22,6 +22,7 @@
       <div class="header__right">
         <div v-if="currentUser" class="user-info">
           <span class="nickname">欢迎：{{ currentUser.nickname }}</span>
+          <span class="header__btn profile-btn" @click="$router.push('/profile')">个人中心</span>
           <span class="header__btn logout-btn" @click="handleLogout">退出登录</span>
         </div>
         <span v-else class="header__btn" @click="$router.push('/login')">登录</span>
