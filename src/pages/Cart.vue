@@ -58,8 +58,16 @@
       <div class="select-total">
         已选商品：<span class="selected-count">{{ checkedGoodsIds.length }}</span> 件
       </div>
-      <div class="total-price">
-        合计：<span class="price-num">¥{{ calculateTotalPrice().toFixed(2) }}</span>
+      <div class="price-info">
+        <div class="original-price" v-if="userProfile && userProfile.memberLevel !== 'bronze'">
+          原价：<span class="original-price-num">¥{{ calculateOriginalPrice().toFixed(2) }}</span>
+        </div>
+        <div class="discount-info" v-if="userProfile && userProfile.memberLevel !== 'bronze'">
+          <span class="discount-tag">会员优惠：-¥{{ calculateMemberDiscount().toFixed(2) }}</span>
+        </div>
+        <div class="total-price">
+          合计：<span class="price-num">¥{{ calculateTotalPrice().toFixed(2) }}</span>
+        </div>
       </div>
       <button class="settle-btn" :disabled="checkedGoodsIds.length === 0" @click="goToCheckout">去结算</button>
     </div>
@@ -144,10 +152,20 @@ const deleteGoods = (id) => {
 }
 
 // 7. 计算选中商品总价（兼容边界）
+const calculateOriginalPrice = () => {
+  return cartStore.goodsList
+    .filter(item => checkedGoodsIds.value.includes(item.id))
+    .reduce((sum, item) => sum + item.price * (item.count || 1), 0)
+}
+
 const calculateTotalPrice = () => {
   return cartStore.goodsList
     .filter(item => checkedGoodsIds.value.includes(item.id))
     .reduce((sum, item) => sum + getMemberPrice(item.price) * (item.count || 1), 0)
+}
+
+const calculateMemberDiscount = () => {
+  return calculateOriginalPrice() - calculateTotalPrice()
 }
 
 const getMemberPrice = (originalPrice) => {
@@ -366,16 +384,35 @@ const goToCheckout = () => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  height: 60px;
-  line-height: 60px;
   background: #f5f5f5;
   border-radius: 4px;
-  padding: 0 20px;
+  padding: 15px 20px;
   margin-top: 20px;
 }
 .selected-count {
   color: #ff6700;
   font-weight: 700;
+}
+.price-info {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+.original-price {
+  font-size: 13px;
+  color: #999;
+}
+.original-price-num {
+  text-decoration: line-through;
+}
+.discount-info {
+  font-size: 13px;
+}
+.discount-tag {
+  background: #fff0f0;
+  color: #ff4d4f;
+  padding: 2px 8px;
+  border-radius: 4px;
 }
 .total-price {
   font-size: 16px;

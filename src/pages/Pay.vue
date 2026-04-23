@@ -265,7 +265,7 @@ const memberLevelInfo = computed(() => {
 
 const availableCoupons = computed(() => {
   if (!userProfile.value) return []
-  return userProfile.value.coupons.filter(c => !c.isUsed)
+  return userProfile.value.coupons.filter(c => !c.isUsed && c.type === 'voucher')
 })
 
 const selectedCoupon = computed(() => {
@@ -345,8 +345,12 @@ const handlePay = () => {
         payGoodsList.value,
         currentAddress.value,
         originalPrice.value,
-        memberDiscount.value + couponDiscount.value,
-        finalPrice.value
+        memberDiscount.value,
+        couponDiscount.value,
+        finalPrice.value,
+        userProfile.value.memberLevel,
+        earnedPoints.value,
+        selectedCoupon.value
       )
 
       userProfile.value.orders.push(order)

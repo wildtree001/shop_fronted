@@ -329,7 +329,7 @@ export const checkBadgeUnlocks = (profile) => {
   return unlockedBadges;
 };
 
-export const createOrder = (goods, address, totalAmount, discountAmount, paidAmount) => {
+export const createOrder = (goods, address, totalAmount, memberDiscount, couponDiscount, paidAmount, memberLevel, earnedPoints, usedCoupon = null) => {
   const now = new Date();
   return {
     orderId: 'ORD' + now.getTime(),
@@ -338,14 +338,25 @@ export const createOrder = (goods, address, totalAmount, discountAmount, paidAmo
       id: g.id,
       name: g.name,
       price: g.price,
+      originalPrice: g.originalPrice || g.price,
       count: g.count,
       category: g.category,
       img: g.img
     })),
     address: address,
     originalAmount: totalAmount,
-    discountAmount: discountAmount,
+    memberDiscount: memberDiscount,
+    couponDiscount: couponDiscount,
+    totalDiscount: memberDiscount + couponDiscount,
     paidAmount: paidAmount,
+    memberLevel: memberLevel,
+    earnedPoints: earnedPoints,
+    usedCoupon: usedCoupon ? {
+      id: usedCoupon.id,
+      name: usedCoupon.name,
+      type: usedCoupon.type,
+      discountAmount: usedCoupon.discountAmount
+    } : null,
     status: 'completed'
   };
 };

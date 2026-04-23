@@ -66,15 +66,19 @@
     <div class="amount-section">
       <div class="amount-item">
         <span>商品总价：</span>
-        <span class="price">¥{{ cartStore.totalPrice }}.00</span>
+        <span class="price">¥{{ originalPrice.toFixed(2) }}</span>
       </div>
-      <div class="amount-item">
-        <span>优惠金额：</span>
-        <span class="discount">¥0.00</span>
+      <div class="amount-item discount" v-if="memberDiscount > 0">
+        <span>会员优惠：</span>
+        <span class="discount">-¥{{ memberDiscount.toFixed(2) }}</span>
       </div>
       <div class="amount-item total">
         <span>实付金额：</span>
-        <span class="total-price">¥{{ cartStore.totalPrice }}.00</span>
+        <span class="total-price">¥{{ finalPrice.toFixed(2) }}</span>
+      </div>
+      <div class="member-info-row" v-if="userProfile && userProfile.memberLevel !== 'bronze'">
+        <span class="member-tag">{{ memberLevelInfo.name }}会员</span>
+        <span class="discount-text">享{{ (memberLevelInfo.discount * 10).toFixed(0) }}折优惠</span>
       </div>
     </div>
 
@@ -98,17 +102,19 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import { ElMessage } from 'element-plus';
 import { useRouter, useRoute } from 'vue-router';
 
 import { useCartStore } from '../store/cart.js';
 import { getCurrentUser } from '../data/user.js';
+import { getOrCreateUserProfile, calculateDiscountPrice, MEMBER_LEVELS } from '../data/userProfile.js';
 
 const cartStore = useCartStore();
 const router = useRouter();
 const route = useRoute(); // 新增：获取路由参数
 const currentUser = ref(null); // 当前登录用户
+const userProfile = ref(null); // 用户个人资料
 const isOrderSubmitted = ref(false); // 标记是否已提交订单
 
 const defaultAddress = ref({
@@ -137,12 +143,38 @@ onMounted(() => {
     router.push('/login');
     return;
   }
+  // 加载用户资料
+  userProfile.value = getOrCreateUserProfile();
   // 加载购物车数据
   cartStore.loadUserCart();
   // 检查购物车是否为空
   if (cartStore.goodsList.length === 0) {
     ElMessage.info('购物车为空，无法结算～');
   }
+});
+
+// 会员等级信息
+const memberLevelInfo = computed(() => {
+  if (!userProfile.value) return MEMBER_LEVELS.bronze;
+  return MEMBER_LEVELS[userProfile.value.memberLevel] || MEMBER_LEVELS.bronze;
+});
+
+// 计算商品总价（原价）
+const originalPrice = computed(() => {
+  return cartStore.goodsList.reduce((sum, item) => sum + item.price * item.count, 0);
+});
+
+// 计算会员折扣
+const memberDiscount = computed(() => {
+  if (!userProfile.value) return 0;
+  const discounted = calculateDiscountPrice(originalPrice.value, userProfile.value.memberLevel);
+  return originalPrice.value - discounted;
+});
+
+// 计算实付金额
+const finalPrice = computed(() => {
+  if (!userProfile.value) return originalPrice.value;
+  return calculateDiscountPrice(originalPrice.value, userProfile.value.memberLevel);
 });
 
 const submitOrder = () => {
@@ -322,6 +354,9 @@ const goToPay = () => {
   padding: 8px 0;
   border-bottom: 1px solid #eee;
 }
+.amount-item.discount {
+  color: #52c41a;
+}
 .amount-item.total {
   font-weight: 700;
   font-size: 16px;
@@ -332,11 +367,29 @@ const goToPay = () => {
   color: #333;
 }
 .discount {
-  color: #ff6700;
+  color: #52c41a;
 }
 .total-price {
   color: #ff6700;
   font-size: 18px;
+}
+.member-info-row {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed #eee;
+}
+.member-tag {
+  font-size: 12px;
+  padding: 2px 8px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #fff;
+  border-radius: 4px;
+}
+.discount-text {
+  font-size: 12px;
+  color: #666;
 }
 
 /* 按钮区样式 */

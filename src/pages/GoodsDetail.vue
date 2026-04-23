@@ -20,7 +20,18 @@
       <!-- 商品基本信息 -->
       <div class="goods-info">
         <h1 class="goods-name">{{ goods.name }}</h1>
-        <div class="goods-price">¥{{ goods.price }}.00</div>
+        <div class="price-row" v-if="userProfile && userProfile.memberLevel !== 'bronze'">
+          <div class="goods-price-original">¥{{ goods.price }}.00</div>
+          <div class="goods-price-member">¥{{ getMemberPrice(goods.price) }}</div>
+          <span class="vip-tag">{{ memberLevelInfo.name }}会员价</span>
+        </div>
+        <div class="price-row" v-else>
+          <div class="goods-price">¥{{ goods.price }}.00</div>
+        </div>
+        <div class="member-discount-info" v-if="userProfile && userProfile.memberLevel !== 'bronze'">
+          <span class="discount-tag">会员优惠：{{ (memberLevelInfo.discount * 10).toFixed(0) }}折</span>
+          <span class="save-tag">立省 ¥{{ (goods.price - getMemberPrice(goods.price)).toFixed(2) }}</span>
+        </div>
         <div class="goods-category">分类：{{ goods.category }}</div>
         <div class="goods-stock">库存：{{ goods.stock }}件</div>
         <div class="goods-desc">
@@ -60,13 +71,14 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import { goodsList } from '../data/goods.js'; // 导入商品列表
 import { useCartStore } from '../store/cart.js'; // 购物车仓库
 import { getCurrentUser } from '../data/user.js'; // 用户登录状态
 import { says } from '../data/says.js'; // 导入商品说法列表
+import { getOrCreateUserProfile, calculateDiscountPrice, MEMBER_LEVELS } from '../data/userProfile.js';
 
 // 初始化数据
 const route = useRoute();
@@ -74,11 +86,15 @@ const router = useRouter();
 const cartStore = useCartStore();
 const goods = ref(null); // 当前商品详情
 const currentUser = ref(null); // 当前登录用户
+const userProfile = ref(null); // 用户个人资料
 
 // 页面加载时获取商品详情
 onMounted(() => {
   // 获取登录状态
   currentUser.value = getCurrentUser();
+  if (currentUser.value) {
+    userProfile.value = getOrCreateUserProfile();
+  }
   // 获取路由参数中的商品ID
   const goodsId = Number(route.params.id);
   // 根据ID查找商品
@@ -87,6 +103,18 @@ onMounted(() => {
     goods.value = targetGoods;
   }
 });
+
+// 会员等级信息
+const memberLevelInfo = computed(() => {
+  if (!userProfile.value) return MEMBER_LEVELS.bronze;
+  return MEMBER_LEVELS[userProfile.value.memberLevel] || MEMBER_LEVELS.bronze;
+});
+
+// 获取会员价
+const getMemberPrice = (originalPrice) => {
+  if (!userProfile.value) return originalPrice;
+  return calculateDiscountPrice(originalPrice, userProfile.value.memberLevel);
+};
 
 // 加入购物车方法（和首页逻辑一致）
 const addToCart = (goodsItem) => {
@@ -179,11 +207,52 @@ const addToCart = (goodsItem) => {
   margin-bottom: 15px;
   line-height: 1.4;
 }
+.price-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 8px;
+}
 .goods-price {
   font-size: 28px;
   color: #ff6700;
   font-weight: 700;
-  margin-bottom: 10px;
+}
+.goods-price-original {
+  font-size: 18px;
+  color: #999;
+  text-decoration: line-through;
+}
+.goods-price-member {
+  font-size: 28px;
+  color: #ff6700;
+  font-weight: 700;
+}
+.vip-tag {
+  font-size: 12px;
+  padding: 2px 8px;
+  background: linear-gradient(135deg, #ff6b6b 0%, #ff4d4f 100%);
+  color: #fff;
+  border-radius: 4px;
+  font-weight: 500;
+}
+.member-discount-info {
+  display: flex;
+  gap: 15px;
+  margin-bottom: 15px;
+}
+.discount-tag, .save-tag {
+  font-size: 13px;
+  padding: 4px 10px;
+  border-radius: 4px;
+}
+.discount-tag {
+  background: #fff0f0;
+  color: #ff4d4f;
+}
+.save-tag {
+  background: #f6ffed;
+  color: #52c41a;
 }
 .goods-category, .goods-stock {
   font-size: 16px;
