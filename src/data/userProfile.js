@@ -26,6 +26,7 @@ const createDefaultUserProfile = (username) => {
     orders: [],
     coupons: [],
     redeemedCoupons: [],
+    pointsHistory: [],
     shoppingStats: {
       totalOrders: 0,
       totalGoods: 0,
@@ -45,6 +46,9 @@ export const getOrCreateUserProfile = () => {
     profile = createDefaultUserProfile(username);
     saveUserData(username, profile);
   }
+  if (!profile.pointsHistory) {
+    profile.pointsHistory = [];
+  }
   return profile;
 };
 
@@ -54,6 +58,30 @@ export const updateUserProfile = (profile) => {
   
   saveUserData(username, profile);
   return true;
+};
+
+export const POINTS_HISTORY_TYPES = {
+  earn: {
+    name: '获得积分',
+    icon: '➕',
+    color: '#52c41a'
+  },
+  spend: {
+    name: '消费积分',
+    icon: '➖',
+    color: '#ff4d4f'
+  }
+};
+
+export const createPointsHistory = (type, amount, description, relatedId = null) => {
+  return {
+    id: 'PH' + Date.now() + Math.random().toString(36).substr(2, 9),
+    type: type,
+    amount: amount,
+    description: description,
+    relatedId: relatedId,
+    createdAt: new Date().toISOString()
+  };
 };
 
 export const MEMBER_LEVELS = {
@@ -254,16 +282,30 @@ export const COUPON_DEFINITIONS = [
   }
 ];
 
+export const COUPON_TYPE_INFO = {
+  voucher: {
+    name: '代金券',
+    icon: '🎫',
+    color: '#1890ff'
+  },
+  gift: {
+    name: '礼品券',
+    icon: '🎁',
+    color: '#52c41a'
+  }
+};
+
 export const calculateMemberLevel = (totalExp) => {
-  if (totalExp >= MEMBER_LEVELS.diamond.minExp) return 'diamond';
-  if (totalExp >= MEMBER_LEVELS.gold.minExp) return 'gold';
-  if (totalExp >= MEMBER_LEVELS.silver.minExp) return 'silver';
+  const roundedExp = Math.round(totalExp * 100) / 100;
+  if (roundedExp >= MEMBER_LEVELS.diamond.minExp) return 'diamond';
+  if (roundedExp >= MEMBER_LEVELS.gold.minExp) return 'gold';
+  if (roundedExp >= MEMBER_LEVELS.silver.minExp) return 'silver';
   return 'bronze';
 };
 
 export const calculateDiscountPrice = (originalPrice, memberLevel) => {
   const level = MEMBER_LEVELS[memberLevel] || MEMBER_LEVELS.bronze;
-  return originalPrice * level.discount;
+  return Math.round(originalPrice * level.discount * 100) / 100;
 };
 
 export const calculateEarnedPoints = (spentAmount, memberLevel) => {
@@ -326,4 +368,8 @@ export const updateShoppingStats = (stats, order) => {
   newStats.dailyDistribution[day] = (newStats.dailyDistribution[day] || 0) + 1;
   
   return newStats;
+};
+
+export const formatExp = (exp) => {
+  return Math.round(exp * 100) / 100;
 };

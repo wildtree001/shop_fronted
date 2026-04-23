@@ -173,7 +173,8 @@ import {
   calculateEarnedPoints,
   checkBadgeUnlocks,
   createOrder,
-  updateShoppingStats
+  updateShoppingStats,
+  createPointsHistory
 } from '../data/userProfile.js'
 
 // 2. 初始化实例
@@ -363,6 +364,18 @@ const handlePay = () => {
           userProfile.value.coupons[couponIndex].isUsed = true
           userProfile.value.coupons[couponIndex].usedAt = new Date().toISOString()
         }
+      }
+
+      if (earnedPoints.value > 0) {
+        if (!userProfile.value.pointsHistory) {
+          userProfile.value.pointsHistory = []
+        }
+        const pointsHistory = createPointsHistory(
+          'earn',
+          earnedPoints.value,
+          `购物获得积分（${memberLevelInfo.value.pointsMultiplier}倍）`
+        )
+        userProfile.value.pointsHistory.push(pointsHistory)
       }
 
       newBadges.value = checkBadgeUnlocks(userProfile.value)
