@@ -35,32 +35,28 @@
 <script setup>
 import { ref } from 'vue';
 import { ElMessage } from 'element-plus';
-import { loginUser } from '../data/user.js'; // 适配pages目录路径
+import { loginUser } from '../data/user.js';
 import { useRouter } from 'vue-router';
+import { useCartStore } from '../store/cart.js';
 
-// 响应式数据
 const username = ref('');
 const password = ref('');
 const router = useRouter();
+const cartStore = useCartStore();
 
-// 登录逻辑
 const handleLogin = () => {
-  // 校验输入
   if (!username.value.trim() || !password.value.trim()) {
     ElMessage.warning('用户名和密码不能为空！');
     return;
   }
- 
 
-  // 调用登录方法
   const res = loginUser(username.value, password.value);
   ElMessage[res.success ? 'success' : 'error'](res.msg);
   
-  // 登录成功 → 1秒后跳首页（核心：跳转并显示昵称）
   if (res.success) {
     setTimeout(() => {
-      router.push('/'); // 跳转到首页
       cartStore.loadUserCart();
+      router.push('/');
     }, 1000);
   }
 };
